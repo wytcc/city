@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>地震了</title>
+    <link href='/static/css/leaflet.css' rel='stylesheet' />
+    <link href='/static/css/main.min.css' rel='stylesheet' />
+</head>
+<body>
+    <div id="earthquake-map"></div>
+    <div id="earthquake-timeline"><svg><g></g></svg></div>
+    <div class="earthquake-types">
+        <!--<div class="item" data="all">-->
+            <!--<input type="checkbox" name="type" id="types-all" checked/>-->
+            <!--<label for="types-all">所有类</label>-->
+        <!--</div>-->
+    </div>
+</body>
+<script src="/static/js/dist/jquery.js"></script>
+<script src="/static/js/dist/d3.v3.js"></script>
+<script src="/static/js/dist/leaflet.js"></script>
+<script src="/static/js/dist/common.js"></script>
+<script src="/static/js/dist/earthquake.js"></script>
+</html>

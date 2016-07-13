@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<title>TrajectoryVis</title>
+		<link href='/static/css/leaflet.css' rel='stylesheet' />
+		<link href='/static/css/jquery-ui.css' rel='stylesheet' />
+		<link href='/static/css/bootstrap.css' rel='stylesheet' />
+		<link href='/static/css/main.min.css' rel='stylesheet' />
+		<script src="/static/js/dist/jquery.js"></script>
+		<script src="/static/js/dist/jquery-ui.js"></script>
+		<script src="/static/js/dist/bootstrap.js"></script>
+		<script src="/static/js/dist/d3.v2.min.js"></script>
+		<script src="/static/js/dist/sankey.js"></script>
+		<script src="/static/js/dist/leaflet.js"></script>
+		<script src="/static/js/dist/common.js"></script>
+		<script src="/static/js/dist/index.js"></script>
+	</head>
+
+	<body id="index-body">
+
+		<!--模式具体属性-->
+		<div id="index-pcoordinates" class="index-container"></div>
+
+		
+		<!--桑葚图-->
+		<div id="index-sankey" class="index-container">
+			<hr/>
+			<svg>
+		        <defs>
+		            <marker id='arrow' orient='auto' markerUnits = "userSpaceOnUse"
+		                    markerWidth='6' markerHeight='6'
+		                    refX='0.1' refY='6'>
+		                <path d='M0,0 V12 L6,6 Z' fill='#a8cadd' />
+		            </marker>
+		        </defs>
+		        <g class="flowGroup"></g>
+		        <g class="trackGroup"></g>
+		        <g class="nodeGroup"></g>
+   			</svg>
+		</div>
+
+		<!--交互式桑葚图-->
+		<!--<div id="index-sankey-move" class="index-container" style="height: 50%">
+			<hr/>
+			<svg>
+		        <defs>
+		            <marker id='arrow' orient='auto' markerUnits = "userSpaceOnUse"
+		                    markerWidth='6' markerHeight='6'
+		                    refX='0.1' refY='6'>
+		                <path d='M0,0 V12 L6,6 Z' fill='#a8cadd' />
+		            </marker>
+		        </defs>
+		        <g class="flowGroup"></g>
+		        <g class="trackGroup"></g>
+		        <g class="nodeGroup"></g>
+    		</svg>
+		</div>-->
+
+		<div class="multiChoose" title="Select Nodes">
+			<span class="glyphicon glyphicon-hand-up" aria-hidden="true"></span>
+		</div>
+
+		<div class="timeBrush" title="Select time period">
+			<span class="glyphicon glyphicon-unchecked disable" aria-hidden="true"></span>
+		</div>
+
+		<div id="sankey-legend1">
+			<span>Moving Ratio: 0</span>
+			<div class="item" data="0.1" title="0.1"></div>
+			<div class="item" data="0.2" title="0.2"></div>
+			<div class="item" data="0.3" title="0.3"></div>
+			<div class="item" data="0.4" title="0.4"></div>
+			<div class="item" data="0.5" title="0.5"></div>
+			<div class="item" data="0.6" title="0.6"></div>
+			<div class="item" data="0.7" title="0.7"></div>
+			<div class="item" data="0.8" title="0.8"></div>
+			<div class="item" data="0.9" title="0.9"></div>
+			<div class="item" data="1" title="1"></div>
+			<span>1</span>
+		</div>
+
+		<!--<div id="sankey-legend2">-->
+		<!--<span>Segment Number:</span>-->
+		<!--<div class="item" data="10"></div>-->
+		<!--<div class="item" data="15"></div>-->
+		<!--<div class="item" data="20"></div>-->
+		<!--<div class="item" data="25"></div>-->
+		<!--</div>-->
+
+		<!--<div id="index-settings" class="index-container">-->
+		<!--<p>-->
+		<!--<label>threshold:</label>-->
+		<!--<input type="text" id="amount_min" readonly style="width: 50px; border:0; color:#f6931f; font-weight:bold;">-->
+		<!--to-->
+		<!--<input type="text" id="amount_max" readonly style="width: 50px; border:0; color:#f6931f; font-weight:bold;">-->
+		<!--</p>-->
+		<!--<div id="slider-range-max"></div>-->
+		<!--</div>-->
+
+		<!--左边-->
+		<div id="index-sideview" class="index-container">
+			<div class="regionBrush" title="Brush a region">
+				<span class="glyphicon glyphicon-unchecked" aria-hidden="true"></span>
+			</div>
+			<div class="showTips" title="Tips for the map">
+				<span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span>
+			</div>
+			<!--<div class="mapTips panel panel-default">-->
+			<!--<div class="item">-->
+			<!--Moving: <img src="./static/images/legend-1.png" alt=""/>-->
+			<!--</div>-->
+			<!--<div class="item">-->
+			<!--Staying: <img src="./static/images/legend-2.png" alt=""/>-->
+			<!--</div>-->
+			<!--<div class="item">-->
+			<!--Home: <img src="./static/images/home.png" alt=""/>-->
+			<!--</div>-->
+			<!--</div>-->
+			<div class="mapTips">
+				<div class="media">
+					<div class="media-left">
+						<a href="#">
+							<!--<img class="media-object" src="./static/images/legend-1.png" alt="...">-->
+							<img class="media-object" alt="地图提示">
+						</a>
+					</div>
+					<div class="media-body">
+						<h4 class="media-heading" style="position: relative; top: 10px; font-size: 12px;">Stop trajectory segment</h4>
+					</div>
+				</div>
+				<div class="media">
+					<div class="media-left">
+						<a href="#">
+							<!--<img class="media-object" src="./static/images/legend-2.png" alt="...">-->
+							<img class="media-object" alt="legend-2.png">
+						</a>
+					</div>
+					<div class="media-body">
+						<h4 class="media-heading" style="position: relative; top: 20px; font-size: 12px;">Move trajectory segment</h4>
+					</div>
+				</div>
+			</div>
+			<div id="index-map">
+				<svg id="mapSvg">
+            <g class="hull"></g>
+            <g class="primitives"></g>
+        </svg>
+			</div>
+			<!--<div id="index-map-legend">-->
+			<!--<table>-->
+			<!--<tr>-->
+			<!--<td>Moving Trajectories: <img src="./static/images/move.png" alt=""/></td>-->
+			<!--<td>Staying Trajectories: <img src="./static/images/stay.png" alt=""/></td>-->
+			<!--</tr>-->
+			<!--<tr>-->
+			<!--<td>Persons' Residence: <img src="./static/images/home.png" alt="" style="height: 20px; position: relative; top: -3px;"/></td>-->
+			<!--&lt;!&ndash;<td>Box select: <img src="./static/images/rect1.png" alt="" style="height: 30px;"/></td>&ndash;&gt;-->
+			<!--</tr>-->
+			<!--</table>-->
+			<!--</div>-->
+			<div id="index-pixelmap" class="index-container">
+
+			</div>
+		</div>
+
+		<div id="pixelmap-legend">
+			<span>Normalized value: 0</span>
+			<div class="item" data="0.1" title="0.1"></div>
+			<div class="item" data="0.2" title="0.2"></div>
+			<div class="item" data="0.3" title="0.3"></div>
+			<div class="item" data="0.4" title="0.4"></div>
+			<div class="item" data="0.5" title="0.5"></div>
+			<div class="item" data="0.6" title="0.6"></div>
+			<div class="item" data="0.7" title="0.7"></div>
+			<div class="item" data="0.8" title="0.8"></div>
+			<div class="item" data="0.9" title="0.9"></div>
+			<div class="item" data="1" title="1"></div>
+			<span>1</span>
+		</div>
+
+		<div id="index-sidebar">
+			<div class="sidebar-info">
+				<ul class="list-group">
+					<li class="list-group-item"><b>Time: </b>Jan.21 - Jan.27, 2014</li>
+					<li class="list-group-item"><b>#Persons: </b>106,378</li>
+					<li class="list-group-item"><b>#Mobility patterns: </b>20</li>
+					<li class="list-group-item"><b>#Dimensions of mobility features: </b>10</li>
+				</ul>
+			</div>
+			<div class="sidebar-search">
+				<div class="page-header">
+					<h2>Search Persons by ID</h2>
+				</div>
+				<form class="navbar-form" role="search">
+					<div class="form-group">
+						<input type="text" class="peopleID form-control" placeholder="People's ID">
+					</div>
+					<div class="search btn btn-default">Search</div>
+				</form>
+				<div class="result">
+					<div class="tcontainer">
+						<div class="subtcontainer">
+							<table class="table table-bordered" style="margin-bottom: 0;">
+								<thead>
+									<tr>
+										<td>
+											<div class="header">Index</div>
+										</td>
+										<td>
+											<div class="header">ID</div>
+										</td>
+										<td>
+											<div class="header">Residence</div>
+										</td>
+									</tr>
+								</thead>
+							</table>
+						</div>
+						<div class="subtcontainer">
+							<table class="content table table-bordered table-hover" style="margin-top: 0;">
+								<!--<thead>-->
+								<!--<tr>-->
+								<!--<td><div class="header">ID</div></td>-->
+								<!--<td><div class="header">Residence</div></td>-->
+								<!--</tr>-->
+								<!--</thead>-->
+								<tbody></tbody>
+							</table>
+						</div>
+					</div>
+					<hr/>
+					<div class="brush-group btn-group btn-group-justified" role="group" style="padding: 0 15px;">
+						<div class="btn-group" role="group">
+							<div class="showMore btn btn-danger">
+								Show Next 20
+							</div>
+						</div>
+					</div>
+					<div class="clear-group btn-group btn-group-justified" role="group" style="padding: 0 15px;">
+						<div class="btn-group" role="group">
+							<div class="clear btn btn-warning">Clear</div>
+						</div>
+					</div>
+				</div>
+				<p class="tips">No Results</p>
+
+				<div></div>
+			</div>
+
+			<!--聚类筛选-->
+			<div class="sidebar-filter">
+				<div class="page-header">
+					<h2>Filter mobility patterns</h2>
+				</div>
+				<div class="transition-filter">
+					<p>
+						<label>Transition Probability From</label>
+						<input type="text" id="amount_min" readonly style="width: 30px; border:0; font-weight:bold;"> To
+						<input type="text" id="amount_max" readonly style="width: 30px; border:0; font-weight:bold;">
+					</p>
+					<div id="slider-range-max"></div>
+				</div>
+			</div>
+		</div>
+	</body>
+
+</html>

@@ -1,0 +1,35 @@
+.Bar_axis path,
+.Bar_axis line {
+  opacity:0.1;
+  fill: none;
+  stroke: gray;
+  shape-rendering: crispEdges;
+}
+.Bar_axis text {
+  font-size: 5px;
+  fill: #4F4F4F ;
+}
+
+.Bar_bar {
+  //fill: #FF6347;
+  //opacity: 0.5;
+}
+
+/*.Bar_bar:hover {
+	fill: #FF6347;
+	opacity: 1.0;
+}*/
+
+.x.Bar_axis path {
+  display: none;
+}
+
+.BarButton {
+  fill:  #C1CDCD;
+  opacity: 0.4;
+  cursor: pointer;
+}
+.BarButtonText {
+  pointer-events: none;
+  fill : #363636;
+}

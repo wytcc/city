@@ -1,0 +1,18 @@
+rect.bordered {
+  stroke: #E6E6E6;
+  stroke-width:2px;
+  opacity: 0.6;
+}
+
+.pixLabel {
+  font-size: 9pt;
+  font-family: Consolas, courier;
+  fill: #aaa;
+}
+
+.pixTotal {
+  font-size: 9pt;
+  font-family: Consolas, courier;
+  fill: black;
+  opacity: 0.8;
+}

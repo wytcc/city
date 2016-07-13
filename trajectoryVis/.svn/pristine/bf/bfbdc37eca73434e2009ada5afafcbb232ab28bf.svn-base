@@ -1,0 +1,99 @@
+webpackJsonp([0,1],[
+/* 0 */
+/***/ function(module, exports) {
+
+	var layerGroup;
+	var points = [];
+	var map;
+	
+	var drawToMap = function(data){
+	    layerGroup && layerGroup.clearLayers();
+	    layerGroup = L.layerGroup();
+	    data.forEach(function(d){
+	        var temp = L.circle([d.lat, d.lng], d.radius * 10000, {
+	            opacity: 1,
+	            weight: 1,
+	            fillOpacity: 0.4
+	        });
+	        layerGroup.addLayer(temp);
+	    });
+	    layerGroup.addTo(map);
+	};
+	
+	$(document).ready(function(){
+	    var number = 1000;
+	    for(var i = 0; i < number; i++){
+	        var temp = {
+	            index: i,
+	            radius: Math.random() * 20,
+	            lat: 60 * Math.random(),
+	            lng: -180 * Math.random() + 180,
+	            time: parseInt(Math.random() * 10000000)
+	        };
+	        points.push(temp);
+	    }
+	
+	    //��ʼ����ͼ
+	    map = L.map('map').setView([0, 0], 2);
+	    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+	        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+	    }).addTo(map);
+	    drawToMap(points);
+	
+	    //��ʼ��ʱ����
+	    var canvas = d3.select("#timeline svg").append("g");
+	    var width = $("#timeline svg").width();
+	    var height = $("#timeline svg").height();
+	
+	    var timeExtent = d3.extent(points, function(d) {
+	        return new Date(d.time);
+	    });
+	    var x = d3.time.scale()
+	        .range([0, width])
+	        .domain(timeExtent);
+	
+	    canvas.selectAll(".point")
+	        .data(points)
+	        .enter()
+	        .append("circle")
+	        .attr("class", 'point')
+	        .attr("r", function(d){
+	            return d.radius;
+	        })
+	        .attr("fill", "red")
+	        .attr("opacity", 0.5)
+	        .attr("stroke", 'black')
+	        .attr("transform", function(d){
+	            return "translate(" + x(new Date(d.time)) + ', ' + height/2 + ')';
+	        });
+	
+	    var brush = d3.svg.brush()
+	        .x(x)
+	        .on('brushend', brushend);
+	    canvas.append('g')
+	        .attr('class', 'x brush')
+	        .call(brush)
+	        .selectAll('rect')
+	        .attr('y', -6)
+	        .attr('height', height);
+	    function brushend() {
+	        var filter;
+	        // If the user has selected no brush area, share everything.
+	        if (brush.empty()) {
+	            filter = function() { return true; }
+	        } else {
+	            // Otherwise, restrict features to only things in the brush extent.
+	            filter = function(feature) {
+	                return feature.time > +brush.extent()[0] &&
+	                    feature.time < (+brush.extent()[1]);
+	            };
+	        }
+	        var filtered = points.filter(filter);
+	        drawToMap(filtered);
+	    }
+	
+	});
+
+/***/ }
+]);
+//# sourceMappingURL=timeline.js.map

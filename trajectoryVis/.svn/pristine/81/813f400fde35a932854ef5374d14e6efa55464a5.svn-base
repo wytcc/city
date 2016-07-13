@@ -1,0 +1,938 @@
+webpackJsonp([1],[
+/* 0 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Created by huwanqi on 2016/3/15.
+	 */
+	var util = __webpack_require__(1);
+	var Leafletmap = __webpack_require__(2);
+	var Sankey = __webpack_require__(3);
+	var coordinates = __webpack_require__(6);
+	var pixelmap = __webpack_require__(7);
+	
+	$(document).ready(function(){
+	    //初始化地图
+	    var leafletmap = new Leafletmap("#index-map");
+	    //初始化sankey图
+	    var sankey = new Sankey("#index-timeline");
+	
+	    sankey.leafletmap = leafletmap;
+	
+	    //初始化平行坐标
+	    //coordinates("#index-pCoordinates");
+	    //初始化像素图
+	    pixelmap("#index-pixelmap");
+	
+	});
+	
+
+
+/***/ },
+/* 1 */,
+/* 2 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Created by huwanqi on 2016/3/21.
+	 */
+	var util = __webpack_require__(1);
+	
+	var map;
+	var trajectoryGroup;
+	var container;
+	var distanceThreshold = 100;
+	
+	var leafletmap = function(dom){
+	    container = dom;
+	    this.render();
+	};
+	
+	var prototype = leafletmap.prototype;
+	
+	prototype.render = function(){
+	    var id = $(container).attr("id");
+	    //initialize map
+	    map = L.map(id).setView([28.38, 121.21], 9);
+	    L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+	        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+	    }).addTo(map);
+	
+	};
+	
+	prototype.findTrajectory = function(type, time){
+	    var that = this;
+	    $.ajax({
+	        type: "GET",
+	        url: util.urlBase + '/getTrajectoryByNode',
+	        data: {
+	            type: type,
+	            time: time
+	        },
+	        success: function (data) {
+	            that.drawTrajectory(data);
+	        }
+	    });
+	};
+	
+	prototype.drawTrajectory = function(tList){
+	    if(tList.length == 0){
+	        console.warn("没有轨迹！");
+	        return false;
+	    }
+	    var arrayOfLatLngs = [];
+	    trajectoryGroup && trajectoryGroup.clearLayers();
+	    trajectoryGroup = L.layerGroup();
+	    tList.forEach(function(t){
+	        if(t.distanceid > distanceThreshold){
+	            return false;
+	        }
+	        var latlngs = [];
+	        var coordinates = (t.trajectory && JSON.parse(JSON.parse(t.trajectory)));
+	        coordinates.forEach(function(d, i){
+	            console.log(d);
+	            var lat = d[1];
+	            var lng = d[0];
+	            if(t.state === 0){
+	                L.circle(L.latLng(lat, lng), 50).addTo(trajectoryGroup);
+	            }
+	            latlngs.push(L.latLng(lat, lng));
+	        });
+	        var polyline = L.polyline(latlngs, {color: 'skyblue', weight: 1, opacity: 0.7}).addTo(trajectoryGroup);
+	        arrayOfLatLngs.push(polyline.getBounds());
+	    });
+	    var bounds = new L.LatLngBounds(arrayOfLatLngs);
+	    map.fitBounds(bounds);
+	    trajectoryGroup.addTo(map);
+	};
+	
+	prototype.clearTrajectory = function(){
+	    trajectoryGroup && trajectoryGroup.clearLayers();
+	};
+	
+	module.exports = leafletmap;
+
+/***/ },
+/* 3 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var util = __webpack_require__(1);
+	var nodeData = __webpack_require__(4);
+	var matrixes = __webpack_require__(5);
+	var coordinates = __webpack_require__(6);
+	var clusters = nodeData.clusters;
+	var columns = nodeData.columns;
+	var timePoints = 84;
+	var clustersNum = nodeData.clustersNum;
+	var barPadding = 5;
+	var barWidth = 20;
+	var padding = 100;
+	
+	var thresholdMin = 500;
+	var thresholdMax = 1500;
+	var tranformMax = 0;
+	var svgPadding = [20, 10];
+	
+	var ySum = 0;
+	var startDate = new Date("2014-01-21 00:00:00");
+	var endDate = new Date("2014-01-28 00:00:00");
+	var timeGap = 1000*60*60*2;
+	var container;
+	
+	var sankey = function(dom){
+	    container = dom;
+	    this.render();
+	};
+	
+	var prototype = sankey.prototype;
+	
+	prototype.render = function(){
+	    var that = this;
+	    var width = barWidth * timePoints + padding * (timePoints - 1) + 40;
+	    var containerWidth = $("dom").width();
+	    var svg = $(container).find("svg");
+	    if(width > containerWidth){
+	        svg.width(width);
+	    }else{
+	        svg.width(containerWidth);
+	        barWidth = 3*(containerWidth / 1082);
+	        padding = 10*(containerWidth / 1082);
+	    }
+	    columns.forEach(function(d, i){
+	        that.drawColumn(d, i);
+	    });
+	    computeLinks(matrixes);
+	    $( "#slider-range-max" ).slider({
+	        range: true,
+	        min: 500,
+	        max: 1500,
+	        values: [thresholdMin, thresholdMax],
+	        slide: function( event, ui ) {
+	            //$( "#amount" ).val( ui.value );
+	            $("#amount_min").val(ui.values[0]);
+	            $("#amount_max").val(ui.values[1]);
+	        },
+	        stop: function( event, ui ) {
+	            thresholdMin = ui.values[0];
+	            thresholdMax = ui.values[1];
+	            computeLinks(matrixes);
+	        }
+	    });
+	    $( "#amount_min" ).val($( "#slider-range-max" ).slider( "values", 0 ));
+	    $( "#amount_max" ).val($( "#slider-range-max" ).slider( "values", 1 ));
+	
+	    svg.on("dblclick", function(){
+	        d3.selectAll("rect").attr("stroke", "white");
+	        d3.selectAll(".link").attr("opacity", "0.2");
+	        that.leafletmap.clearTrajectory();
+	        d3.select("#index-pCoordinates").select("svg").remove();
+	    });
+	};
+	
+	prototype.drawColumn = function(column, index){
+	    var that = this;
+	    var svg = $(container).find("svg");
+	    var height = svg.height();
+	    var canvas = d3.select(svg[0])
+	        .select("g.nodeGroup")
+	        .attr("transform", "translate(" + svgPadding[0] + ", " + svgPadding[1] + ")");
+	    var left = index * (barWidth + padding);
+	    var sum = 0;
+	    column.forEach(function(d){
+	        sum += d;
+	    });
+	    ySum = sum;
+	    var y = d3.scale.linear().domain([0, sum]).range([0, height - (clustersNum - 1) * barPadding - 50]);
+	    var counter = 0;
+	    var colors = d3.scale.category20();
+	    column.forEach(function(d, i){
+	        canvas.append("rect")
+	            .attr("row", i)
+	            .attr("col", index)
+	            .attr("size", d)
+	            .attr("x", left)
+	            .attr("y", counter)
+	            .attr("width", barWidth)
+	            .attr("height", y(d))
+	            .attr("stroke", "white")
+	            .attr("stroke-width", 3)
+	            .attr("fill", colors(i))
+	            .on("click", function(){
+	                d3.event.stopPropagation();
+	                //reset
+	                d3.selectAll(".link").attr("opacity", 0);
+	                d3.selectAll("rect").attr("stroke", "white");
+	
+	                d3.select(this).attr("stroke", "red");
+	                var row = d3.select(this).attr("row");
+	                var col = d3.select(this).attr("col");
+	                findParent(row, col);
+	                findChild(row, col);
+	
+	                that.leafletmap.findTrajectory(row, col);
+	
+	                coordinates("#index-pCoordinates", row, col);
+	
+	            });
+	        counter += y(d) + barPadding;
+	    });
+	    var time = new Date(startDate.valueOf() + index * timeGap);
+	    var timeStr = util.formatTime(time);
+	    canvas.append("text")
+	        .text(timeStr)
+	        .attr("text-anchor", "middle")
+	        .attr("transform", "translate(" + (left + barWidth / 2) + ", " + (height - 30) + ")");
+	};
+	
+	var findParent = function(row, col){
+	    var key = col + '-' + row;
+	    var links = d3.selectAll(".link[target='" + key + "']");
+	    if(links[0].length == 0){
+	        return false;
+	    }else{
+	        links.each(function(){
+	            d3.select(this).attr("opacity", 0.3);
+	            var source = d3.select(this).attr("source");
+	            var col1 = source.split("-")[0];
+	            var row1 = source.split("-")[1];
+	            d3.select("rect[row='" + row1 + "'][col='" + col1 + "']").attr("stroke", "black");
+	            findParent(row1, col1);
+	        });
+	    }
+	};
+	
+	var findChild = function(row, col){
+	    var key = col + '-' + row;
+	    var links = d3.selectAll(".link[source='" + key + "']");
+	    if(links[0].length == 0){
+	        return false;
+	    }else{
+	        links.each(function(){
+	            d3.select(this).attr("opacity", 0.3);
+	            var target = d3.select(this).attr("target");
+	            var col1 = target.split("-")[0];
+	            var row1 = target.split("-")[1];
+	            d3.select("rect[row='" + row1 + "'][col='" + col1 + "']").attr("stroke", "black");
+	            findChild(row1, col1);
+	        });
+	    }
+	};
+	
+	var computeLinks = function(matrixes){
+	    var svg = $(container).find("svg");
+	    var height = svg.height();
+	    var y = d3.scale.linear().domain([0, ySum]).range([0, height - (clustersNum - 1) * barPadding]);
+	    var links = [];
+	    matrixes.forEach(function(matrix, index){
+	        if(index == 0){
+	            return;
+	        }
+	        for(var i = 0; i < matrix.length; i++){
+	            var row = matrix[i];
+	            for(var j = 0; j < row.length; j++){
+	                var n1 = d3.select("rect[col='" + (index-1) + "'][row='" + j + "']");
+	                var n2 = d3.select("rect[col='" + (index) + "'][row='" + i + "']");
+	                var size = parseFloat(n1.attr("size"));
+	                var val = size * matrix[i][j];
+	                if(val > tranformMax){
+	                    tranformMax = val;
+	                }
+	                if(val > thresholdMin && val < thresholdMax && i!=j){
+	                    //drawLink(i, j, index, matrix[i][j]);
+	                    var link = {
+	                        source: {
+	                            dom: n1,
+	                            col: index-1,
+	                            row: j
+	                        },
+	                        target: {
+	                            dom: n2,
+	                            col: index,
+	                            row: i
+	                        },
+	                        value: matrix[i][j]
+	                    };
+	                    links.push(link);
+	                }
+	            }
+	        }
+	    });
+	    var incomes = {};
+	    var outcomes = {};
+	    var linksToDraw = [];
+	    links.forEach(function(link){
+	        var temp = {
+	            sx: null,
+	            sy0: null,
+	            sy1: null,
+	            ex: null,
+	            ey0: null,
+	            ey1: null,
+	            source: null,
+	            target: null,
+	            //size: null
+	        };
+	        var source = link.source;
+	        var target = link.target;
+	        var sourceDom = source.dom;
+	        var sourceSize = sourceDom.attr("size");
+	        var targetDom = target.dom;
+	        temp.sx = parseFloat(sourceDom.attr("x")) + barWidth + 2;
+	        temp.ex = parseFloat(targetDom.attr("x")) - 2;
+	        var transform = y(link.value * sourceSize);
+	
+	        var key = source.col + '-' + source.row;
+	        temp.source = key;
+	        if(!outcomes[key]){
+	            temp.sy0 = parseFloat(sourceDom.attr("y")) + 3;
+	            temp.sy1 = temp.sy0 + transform;
+	            outcomes[key] = transform + 3;
+	        }else{
+	            temp.sy0 = parseFloat(sourceDom.attr("y")) + outcomes[key];
+	            temp.sy1 = temp.sy0 + transform;
+	            outcomes[key] += transform
+	        }
+	
+	        var key2 = target.col + '-' + target.row;
+	        temp.target = key2;
+	        if(!incomes[key2]){
+	            temp.ey0 = parseFloat(targetDom.attr("y")) + 3;
+	            temp.ey1 = temp.ey0 + transform;
+	            incomes[key2] = transform + 3;
+	        }else{
+	            temp.ey0 = parseFloat(targetDom.attr("y")) + incomes[key2];
+	            temp.ey1 = temp.ey0 + transform;
+	            incomes[key2] += transform;
+	        }
+	        linksToDraw.push(temp);
+	    });
+	    drawLinks(linksToDraw);
+	};
+	
+	var drawLinks = function(links){
+	    d3.selectAll(".linkGroup").remove();
+	    var flowGenerator = function(d) {
+	        var path = ["M " + (d.sx) + "," + d.sy0];
+	        var cpx = padding / 2;
+	        path.push("C " + (d.sx + cpx) + "," + d.sy0 +
+	            " " + (d.ex - cpx) + "," + d.ey0 +
+	            " " + (d.ex) + "," + d.ey0);
+	        path.push("L " + (d.ex) + "," + d.ey0 +
+	            " " + (d.ex) + "," + d.ey1);
+	        path.push("C " + (d.ex- cpx) + "," + d.ey1 +
+	            " " + (d.sx + cpx) + "," + d.sy1 +
+	            " " + (d.sx) + "," + d.sy1);
+	
+	        path.push("L " + d.sx + "," + d.sy1+
+	            " " + d.sx + "," + d.sy0);
+	        return path.join(" ");
+	    };
+	
+	    var canvas = d3.select("#index-timeline svg")
+	        .append("g")
+	        .attr("class", "linkGroup")
+	        .attr("transform", "translate(" + svgPadding[0] + ", " + svgPadding[1] + ")");
+	    var links = canvas.selectAll(".link")
+	        .data(links)
+	        .enter()
+	        .append("path")
+	        .attr("class", "link")
+	        .attr("d", flowGenerator)
+	        .attr("source", function(d){
+	            return d.source;
+	        })
+	        .attr("target", function(d){
+	            return d.target;
+	        })
+	        .attr("fill", 'rgb(211, 211, 211)')
+	        .attr("opacity", 0.5)
+	        .on("click", function(d) {
+	            console.log(d);
+	        });
+	};
+	
+	module.exports = sankey;
+
+/***/ },
+/* 4 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Created by huwanqi on 2016/3/15.
+	 */
+	var util = __webpack_require__(1);
+	var timePoints = 84;
+	var clustersNum;
+	
+	var clusters = [];
+	var columns = [];
+	
+	$.ajax({
+	    url: "/static/data/nodesize.csv",
+	    async: false,
+	    type: 'GET',
+	    success: function(data){
+	        clusters = util.CSVToArray(data);
+	        clustersNum = clusters.length;
+	        columns = [];
+	        for(var i = 0; i < timePoints; i++){
+	            columns[i] = [];
+	            for(var j = 0; j < clustersNum; j++){
+	                columns[i].push(parseFloat(clusters[j][i]));
+	            }
+	        }
+	    },
+	    error: function(data){
+	        console.log(data);
+	    }
+	});
+	
+	module.exports = {
+	    clusters: clusters,
+	    columns: columns,
+	    timePoints: timePoints,
+	    clustersNum: clustersNum
+	};
+
+
+/***/ },
+/* 5 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Created by huwanqi on 2016/3/15.
+	 */
+	var util = __webpack_require__(1);
+	var nodeData = __webpack_require__(4);
+	var clustersNum = nodeData.clustersNum;
+	var timePoints = 84;
+	
+	var matrixes = [];
+	
+	$.ajax({
+	    url: "/static/data/transition.csv",
+	    async: false,
+	    type: 'GET',
+	    success: function(data){
+	        var rawData = util.CSVToArray(data);
+	        for(var i = 0; i < timePoints; i++){
+	            matrixes[i] = [];
+	            for(var j = 0; j < rawData.length; j++){
+	                var row = rawData[j];
+	                var temp = [];
+	                for(var k = i * clustersNum; k < (i+1) * clustersNum; k++){
+	                    temp.push(parseFloat(row[k]));
+	                }
+	                matrixes[i].push(temp);
+	            }
+	        }
+	    },
+	    error: function(data){
+	        console.log(data);
+	    }
+	});
+	
+	module.exports = matrixes;
+
+
+/***/ },
+/* 6 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var util = __webpack_require__(1);
+	
+	var fields = {
+		AveLocX: 6,
+		AveLocY: 7,
+		AveSpeed: 2,
+		ETrand: 0,
+		Eunc: 1,
+		HomeLocX: 8,
+		HomeLocY: 9,
+		MoveDis: 3,
+		MoveRatio: 5,
+		Rg: 4
+	};
+	
+	var fields2 = [
+		"AveLocX",
+		"AveLocY",
+		"AveSpeed",
+		"ETrand",
+		"Eunc",
+		"HomeLocX",
+		"HomeLocY",
+		"MoveDis",
+		"MoveRatio",
+		"Rg"
+	];
+	
+	function render(dom, type, time) {
+		var coord_width = $(dom).width(),
+			coord_height = $(dom).height();
+	
+		d3.select(dom).select("svg").remove();
+		d3.select(dom)
+			.append("svg")
+			.attr("id", "coord")
+			.style("width", coord_width + "px")
+			.style("height", coord_height + "px");
+	
+		var Bar_margin = {top: coord_height/5, right: coord_width/60, bottom: coord_height/8, left: coord_width/60},
+			Bar_width = coord_width/10-Bar_margin.right-Bar_margin.left,
+			Bar_height = coord_height/2;
+		var Bar_len = Bar_margin.left+Bar_margin.right+Bar_width;
+	
+		var Bar_x = d3.scale.linear()
+			.range([0, Bar_width]);
+		var Bar_y = d3.scale.linear()
+			.range([Bar_height, 0]);
+	
+		var Bar_xdomain;
+		var Bar_ydomain;
+	
+		var Bar_xAxis = d3.svg.axis()
+			.scale(Bar_x)
+			.orient("bottom");
+		var Bar_yAxis = d3.svg.axis()
+			.scale(Bar_y)
+			.tickValues(0,0)
+			.orient("left");
+	
+		var Bar_name = [['Temporal','correlated','Entropy'],['Temporal','uncorrelated','Entropy'],
+						['Average','Speed'], ['Activity','Mileage'],
+						['Radius','of','Gyration'],['Activity','Radius'],
+						['Centroid','Longtitude'],['Centroid','Latitude'],
+						['Residence','Longtitude'],['Residence','Latitude']
+						];
+	
+		var Coord_num = 10, Bar_num = 10;
+		//var Bar_max = 100;
+		var Bar_max = [];
+		var statistics = null;
+		$.ajax({
+			type: "GET",
+			url: util.urlBase + '/statistics',
+			data: {
+				time: time,
+				type: type
+			},
+			async: false,
+			success: function(data){
+				statistics = data;
+				console.log(data);
+			},
+			error: function(data){
+				console.log(data);
+			}
+		});
+		var i = -1;
+		//var Bar_data = [];
+		//for(var i = 0; i < Coord_num; i++) {
+		//	Bar_data[i] = [];
+		//	var k1 = parseInt(Math.random() * 10), k2 = parseInt(Math.random() * 10) + 10;
+		//	for (var j = 0; j < Bar_num; j++)
+		//		if (j < k1) Bar_data[i][j] = 0;
+		//		else if (j > k2) Bar_data[i][j] = 0;
+		//		else Bar_data[i][j] = parseInt(Bar_max * Math.random());
+		//}
+		var Bar_data = [];
+		for(var i = 0; i < Coord_num; i++) {
+			Bar_data[i] = [];
+			Bar_max[i] = 0;
+			for (var j = 0; j < Bar_num; j++){
+				var count = statistics[i * Coord_num + j].pointscounts;
+				if(count > Bar_max[i]){
+					Bar_max[i] = count;
+				}
+				Bar_data[i][j] = count;
+			}
+		}
+	
+		var fieldRanges = null;
+		$.ajax({
+			type: "GET",
+			url: util.urlBase + '/getClusterRange',
+			async: false,
+			success: function(data){
+				fieldRanges = data[0];
+			},
+			error: function(data){
+				console.log(data);
+			}
+		});
+	
+	
+	
+		//for (i = 0; i < Coord_num; i++) {}
+		for (var field in fields) {
+			var i = fields[field];
+			var barName = Bar_name[i];
+			var Bar_svg = d3.select("#coord")
+				.append("g")
+				.attr("transform", "translate(" + (Bar_margin.left + Bar_len * i) + "," + Bar_margin.top + ")");
+	
+			var fieldRange = fieldRanges[field] && JSON.parse(fieldRanges[field]);
+			var ymin = fieldRange[0].toFixed(3), ymax = fieldRange[1].toFixed(3);
+			Bar_xdomain = [0, Bar_max[i]];
+			Bar_x.domain(Bar_xdomain);
+			Bar_ydomain = [0, Bar_num];
+			Bar_y.domain(Bar_ydomain);
+	
+			//Bar X 轴
+			Bar_svg.append("g")
+				.attr("class", "x Bar_axis")
+				.attr("transform", "translate(0," + Bar_height + ")")
+				.style("opacity",0)
+				.call(Bar_xAxis)
+			.append("text")
+				.attr("class", "label")
+				.attr("x", Bar_width)
+				.attr("y", -6)
+				.style("text-anchor", "end")
+				.text("");
+			//Bar Y 轴
+			Bar_svg.append("g")
+				.attr("id", "y_g"+i)
+				.attr("class", "y Bar_axis")
+				.call(Bar_yAxis)
+			.append("text")
+				.attr("transform", "translate(" + 30 + "," + Bar_height + ")")
+				.attr("y", 8)
+				.style("text-anchor", "end")
+				.text(ymin);
+			d3.select("#y_g"+i)
+			.append("text")
+				.attr("transform", "translate(" + 30 + "," + 0 + ")")
+				.style("text-anchor", "end")
+				.text(ymax);
+			d3.select("#y_g"+i)
+			.append("line")
+				.attr("x1", 0)
+				.attr("y1", 0)
+				.attr("x2", 0)
+				.attr("y2", Bar_height)
+				.style("stroke","red")
+				.style("shape-rendering","crispEdges")
+				.style("opacity",0.3);
+			for (j = 0; j < barName.length; j++)
+				d3.select("#y_g"+i)
+				.append("text")
+					.attr("transform", "translate(" + (6 + (8-barName[j].length)*2) + "," + (Bar_height + 30 + 12*j) + ")")
+					.text(barName[j]);
+	
+			var Rec_height = Bar_height/20;
+			//Bar
+			for (j = 0; j < Bar_num; j++)
+			{
+				Bar_svg.append("rect")
+					.attr("id", "Bar_rect")
+					.attr("class", "Bar_bar")
+					.attr("x", 0)
+					.attr("width", Bar_x(Bar_data[i][j]) )
+					.attr("y", Bar_y(j) - Rec_height )
+					.attr("height", Rec_height);
+			}
+		}
+	
+		// 彩带
+		var Bar_vertices = [];
+		for (i = 0; i < Coord_num; i++)
+		{
+			var j = 0;
+			while (Bar_data[i][j]==0 && j < Bar_num-1) j++;
+			Bar_vertices.push([Bar_len*i, Bar_y(j)]);
+		}
+		for (i = Coord_num-1; i >= 0; i--)
+		{
+			var j = Bar_num - 1;
+			while (Bar_data[i][j]==0 && j > 0) j--;
+			Bar_vertices.push([Bar_len*i, Bar_y(j) - Rec_height]);
+		}
+		// console.log(Bar_vertices);
+		d3.select("#coord")
+			.append("g")
+			.attr("transform", "translate(" + Bar_margin.left + "," + Bar_margin.top + ")")
+			.append('polygon')
+			.style({
+				fill: '#D3D3D3',
+				opacity: 0.5
+			})
+			.attr('points',Bar_vertices);
+	
+		// head
+		var Bar_top_margin = {top: 0, right: 50, bottom: 0, left: 10},
+			Bar_top_width = coord_width,
+			Bar_top_height = coord_height/8;
+	
+		var Bar_top_svg = d3.select("#coord")
+				.append("g")
+				.attr("transform", "translate(" + Bar_top_margin.left + "," + Bar_top_margin.top + ")");
+			
+		//Bar_top_svg.append("rect")
+		//	.attr("class", "BarButton")
+		//	.attr("width", 74)
+		//	.attr("height", 25)
+		//	.attr("x", Bar_top_width/2 - 50)
+		//	.attr("y", Bar_top_height/4)
+		//	.on("click", function () {
+		//
+		//	});
+	    //
+		//Bar_top_svg.append("text")
+		//	.attr("class", "BarButtonText")
+		//	.attr("width", 50)
+		//	.attr("height", 25)
+		//	.attr("x", Bar_top_width/2 - 50 + 16)
+		//	.attr("y", Bar_top_height/4 + 16)
+		//	.text("RESET");
+	
+		//Bar_top_svg.append("rect")
+		//	.attr("class", "BarButton")
+		//	.attr("width", 74)
+		//	.attr("height", 25)
+		//	.attr("x", Bar_top_width/2 + 50)
+		//	.attr("y", Bar_top_height/4)
+		//	.on("click", function () {
+		//
+		//	});
+	    //
+		//Bar_top_svg.append("text")
+		//	.attr("class", "BarButtonText")
+		//	.attr("width", 50)
+		//	.attr("height", 25)
+		//	.attr("x", Bar_top_width/2 + 50 + 16)
+		//	.attr("y", Bar_top_height/4 + 16)
+		//	.text("CLEAR");
+	
+	}
+	
+	// render("body");
+	
+	module.exports = render;
+
+
+/***/ },
+/* 7 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var util = __webpack_require__(1);
+	
+	function render(dom) {
+	
+	    var pix_width = $(dom).width(),
+	        pix_height = pix_width/9*10;
+	
+	    var pix_left = pix_width/9*4;
+	    pix_width = pix_width/9*5;
+	
+	    var gridSize = Math.floor(pix_width / 10),
+	        color_num = 6,
+	        colors = ["#FFFAF0","#FFDAB9","#FFA07A","#FF6347","#EE2C2C","#FF0000"];
+	
+	    var pattern_num = 20;
+	    var pattern = [];
+	    var patternData = [];
+	    var patternVal = [];
+	    for (var i = 0; i < pattern_num; i++){
+	        pattern.push("Pattern"+i);
+	        $.ajax({
+	            type: "GET",
+	            url: util.urlBase + '/statisticswithouttime',
+	            data: {
+	                type: i
+	            },
+	            async: false,
+	            success: function(data){
+	                //var avgs = [];
+	                var sum = 0;
+	                var t = 0;
+	                for(var i = 0; i < data.length; i++){
+	                    t += data[i].pointscounts;
+	                    sum += data[i].pointscounts * data[i].pointsvalue / 10;
+	                    if(i % 10 == 9){
+	                        patternData.push({
+	                           pat: data[i].clusterid,
+	                           dim: data[i].dimindex,
+	                           val: sum / t
+	                        });
+	                        sum = 0;
+	                        t = 0;
+	                    }
+	                }
+	                //patternData[data[0].clusterid] = avgs;
+	                patternVal[data[0].clusterid] = {
+	                    pat: data[0].clusterid,
+	                    val: t
+	                };
+	            },
+	            error: function(data){
+	                console.log(data);
+	            }
+	        });
+	    }
+	    //console.log(patternData);
+	    //var data = [];
+	    //var pattern_val = [];
+	    //for (var i = 0; i < pattern_num; i++)
+	    //{
+	    //    var t = 0;
+	    //    for (var j = 0; j < 10; j++) {
+	    //        var temp = {
+	    //            "pat": i,
+	    //            "dim": j,
+	    //            "val": Math.random() * 10
+	    //        };
+	    //        data.push(temp);
+	    //        t += temp.val;
+	    //    }
+	    //    pattern_val.push({"pat":i,"val":t});
+	    //}
+	
+	    var svg = d3.select(dom)
+	        .append("svg")
+	        .attr("id", "pix")
+	        .attr("width", pix_width + pix_left + "px")
+	        .attr("height", pix_height + "px")
+	        .append("g")
+	        .attr("transform", "translate(" + pix_left + ", 0)");
+	
+	    svg.selectAll(".pixLabel")
+	        .data(pattern)
+	        .enter().append("text")
+	        .text(function (d) { return d; })
+	        .attr("x", -gridSize)
+	        .attr("y", function (d, i) { return i * gridSize; })
+	        .style("text-anchor", "end")
+	        .attr("transform", "translate(" + -4*gridSize + "," + gridSize/1.5 + ")")
+	        .attr("class", "pixLabel");
+	
+	    var pixChart = function(dd) {
+	
+	        var colorScale = d3.scale.quantile()
+	            .domain([0, 1, d3.max(patternData, function (d) { return d.val; })])
+	            .range(colors);
+	
+	        svg.selectAll(".dim")
+	            .data(patternData)
+	            .enter().append("rect")
+	            .attr("x", function(d) {
+	                return d.dim * gridSize;
+	            })
+	            .attr("y", function(d) {
+	                return d.pat * gridSize;
+	            })
+	            .attr("rx", 4)
+	            .attr("ry", 4)
+	            .attr("class", "dim bordered")
+	            .attr("width", gridSize)
+	            .attr("height", gridSize)
+	            .attr("title", function(d){
+	                return d.val;
+	            })
+	            .style("fill", function(d) {
+	                return colorScale(d.val);
+	            } );
+	
+	        colorScale.domain([0, 1, d3.max(patternVal, function (d) { return d.val; })])
+	        d3.select("#pix")
+	            .append("g")
+	            .attr("transform", "translate(" + pix_left/2 + ", 0)")
+	            .selectAll(".dim")
+	            .data(patternVal)
+	            .enter().append("rect")
+	            .attr("x", 0)
+	            .attr("y", function(d) { return d.pat * gridSize; })
+	            .attr("rx", 4)
+	            .attr("ry", 4)
+	            .attr("class", "dim bordered")
+	            .attr("width", gridSize*4)
+	            .attr("height", gridSize)
+	            .style("fill", function(d) { return colorScale(d.val);} )
+	            .append("text")
+	            .text(function(d) { return d.val;});
+	
+	        d3.select("#pix")
+	            .append("g")
+	            .attr("transform", "translate(" + pix_left/2 + ", 0)")
+	            .selectAll(".pixTotal")
+	            .data(patternVal)
+	            .enter().append("text")
+	            .text(function (d) { return parseInt(d.val); })
+	            .attr("x", 0)
+	            .attr("y", function (d, i) { return i * gridSize; })
+	            .attr("transform", "translate(" + 20 + "," + gridSize/1.5 + ")")
+	            .attr("class", "pixTotal");
+	    };
+	
+	    pixChart("data");
+	}
+	
+	// render("bpdy");
+	
+	module.exports = render;
+
+
+/***/ }
+]);
+//# sourceMappingURL=index.js.map
